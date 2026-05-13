@@ -67,13 +67,13 @@ print(processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True)[0]
 
 ### vLLM
 
+> The vLLM integration is registered as a `vllm.general_plugins` entry point in `setup.py`, so
+> after `pip install -e .` the patches are auto-applied in every vLLM process. Just set `PIXELPRUNE_ENABLED=true`
+> and use vLLM as usual.
+
 ```python
 import os
 os.environ["PIXELPRUNE_ENABLED"] = "true"
-
-from pixelprune import apply_pixelprune
-apply_pixelprune(model="qwen3_vl", backend="vllm")  # or "qwen3_5" for Qwen3.5
-# call BEFORE creating LLM
 
 from PIL import Image
 from transformers import AutoProcessor

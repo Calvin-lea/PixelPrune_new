@@ -11,7 +11,7 @@ PixelPrune: Pixel-Level Adaptive Visual Token Reduction via Predictive Coding.
 
 快速使用::
 
-    # 方式一：通过 monkey-patch 注入（推荐）
+    # HuggingFace 后端：通过 monkey-patch 注入（在加载模型前调用）
     import os
     os.environ["PIXELPRUNE_ENABLED"] = "true"
     os.environ["PIXELPRUNE_METHOD"] = "pred_2d"  # 默认
@@ -19,7 +19,11 @@ PixelPrune: Pixel-Level Adaptive Visual Token Reduction via Predictive Coding.
     from pixelprune import apply_pixelprune
     apply_pixelprune(model="qwen3_vl")   # 或 "qwen3_5"
 
-    # 方式二：直接调用选择器
+    # vLLM 后端：不需要调用 apply_pixelprune —— 由 setup.py 注册的
+    # ``vllm.general_plugins`` entry point 在每个 vLLM 进程启动时自动加载。
+    # 用户只需设置 PIXELPRUNE_ENABLED=true 后正常使用 vLLM 即可。
+
+    # 也可以直接调用选择器
     from pixelprune import compute_merged_keep_indices
     indices_list = compute_merged_keep_indices(pixel_values, image_grid_thw)
 
@@ -58,12 +62,14 @@ __all__ = [
 ]
 
 
-def apply_pixelprune(model: str = "qwen3_vl", backend: str = "hf") -> None:
-    """对 Qwen3-VL / Qwen3.5 应用 monkey-patch。需在加载模型前调用。
+def apply_pixelprune(model: str = "qwen3_vl") -> None:
+    """对 Qwen3-VL / Qwen3.5 的 HuggingFace 实现应用 monkey-patch。
+
+    需在加载模型前调用。**vLLM 后端无需调用此函数** —— PixelPrune 通过
+    ``vllm.general_plugins`` entry point 在每个 vLLM 进程启动时自动加载。
 
     Args:
         model: 模型架构，'qwen3_vl' 或 'qwen3_5'。
-        backend: 推理后端，'hf' 为 HuggingFace，'vllm' 为 vLLM。
     """
     from .patches import apply_patches as _apply
-    _apply(model=model, backend=backend)
+    _apply(model=model)

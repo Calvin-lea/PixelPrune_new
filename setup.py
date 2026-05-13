@@ -11,4 +11,9 @@ setup(
     install_requires=[
         "numpy",
     ],
+    entry_points={
+        "vllm.general_plugins": [
+            "pixelprune = pixelprune.patches.vllm_bootstrap:maybe_apply_patches",
+        ],
+    },
 )

@@ -62,13 +62,9 @@ class OmniDocBench(ImageBaseDataset):
 
     def evaluate(self, eval_file, **judge_kwargs):
         tsv_path=self.data_path
-        # 检查结果文件是否已经存在，若存在则跳过评估
-        overall_file = get_intermediate_file_path(eval_file, '_overall')
-        if os.path.exists(overall_file):
-            print(f'评估结果已存在，跳过评估：{overall_file}')
-            return load(overall_file)
         End2end_evaluator=end2end_evaluator(eval_file,tsv_path)
         Table_evalutor=table_evalutor(eval_file,tsv_path)
+
         metrics_all=End2end_evaluator.score()
         metircs_table=Table_evalutor.score()
 

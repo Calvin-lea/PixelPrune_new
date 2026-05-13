@@ -160,40 +160,25 @@ class Registry:
 METRIC_REGISTRY = Registry()
 
 
-def _teds_worker(args):
-    """进程池 worker：计算单个样本的 TEDS 分数（可跨进程序列化）。"""
-    pred, gt = args
-    teds = TEDS(structure_only=False)
-    teds_so = TEDS(structure_only=True)
-    return teds.evaluate(pred, gt), teds_so.evaluate(pred, gt)
-
-
 @METRIC_REGISTRY.register("TEDS")
 class call_TEDS():
     def __init__(self, samples):
         self.samples = samples
-
     def evaluate(self, group_info=[], save_name='default'):
-        import os
-        from concurrent.futures import ProcessPoolExecutor
-
-        samples = self.samples
-        pairs = [
-            (s['norm_pred'] if s.get('norm_pred') else s['pred'],
-             s['norm_gt']   if s.get('norm_gt')   else s['gt'])
-            for s in samples
-        ]
-
-        # 并行计算 TEDS（CPU 密集型，用进程池）
-        nproc = min(32, os.cpu_count() or 4)
-        print(f'[TEDS] Computing {len(pairs)} samples with {nproc} workers ...')
-        with ProcessPoolExecutor(max_workers=nproc) as pool:
-            results = list(tqdm(pool.map(_teds_worker, pairs), total=len(pairs), desc='TEDS'))
+        teds = TEDS(structure_only=False)
+        teds_structure_only = TEDS(structure_only=True)
 
         group_scores = defaultdict(list)
         group_scores_structure_only = defaultdict(list)
 
-        for sample, (score, score_structure_only) in zip(samples, results):
+        samples = self.samples
+        for sample in samples:
+            gt = sample['norm_gt'] if sample.get('norm_gt') else sample['gt']
+            pred = sample['norm_pred'] if sample.get('norm_pred') else sample['pred']
+
+            score = teds.evaluate(pred, gt)
+            score_structure_only = teds_structure_only.evaluate(pred, gt)
+            # print('TEDS score:', score)
             group_scores['all'].append(score)
             group_scores_structure_only['all'].append(score_structure_only)
 
@@ -205,10 +190,10 @@ class call_TEDS():
             for group in group_info:
                 select_flag = True
                 for k, v in group.items():
-                    for gt_attribute in sample['gt_attribute']:
-                        if not gt_attribute:
+                    for gt_attribute in sample['gt_attribute']:   # gt_attribute is a list containing all merged gt attributes
+                        if not gt_attribute:   # if no GT attributes, don't include in calculation
                             select_flag = False
-                        elif gt_attribute[k] != v:
+                        elif gt_attribute[k] != v:  # if any gt attribute doesn't meet criteria, don't select
                             select_flag = False
                 if select_flag:
                     group_scores[str(group)].append(score)
@@ -239,7 +224,7 @@ class call_BLEU():
     def evaluate(self, group_info=[], save_name='default'):
         group_samples = get_groups(self.samples, group_info)
         result = {}
-        bleu = evaluate.load("bleu", keep_in_memory=True, experiment_id=random.randint(1, int(1e8)))
+        bleu = evaluate.load("bleu", keep_in_memory=True, experiment_id=random.randint(1,1e8))
 
         for group_name, samples in group_samples.items():
             predictions, references = [], []

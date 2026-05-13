@@ -175,25 +175,32 @@ def _resolve_patch_backend(model_path: str) -> str:
     return 'qwen3_vl'
 
 
-def _maybe_apply_pixelprune(model_path: str) -> None:
-    """Apply PixelPrune monkey-patch if enabled via env vars."""
-    enabled = (
-        os.environ.get('PIXELPRUNE_ENABLED', os.environ.get('ENABLE_DEDUP', 'false')).lower()
-        in ('true', '1', 'yes')
-    )
+def _maybe_apply_pixelprune(model_path: str, use_vllm: bool) -> None:
+    """Apply PixelPrune monkey-patch if enabled via env vars.
+
+    vLLM path: nothing to do here. PixelPrune is auto-applied in every vLLM
+    process via the ``vllm.general_plugins`` entry point registered in
+    ``setup.py`` (bootstrap reads ``PIXELPRUNE_ENABLED`` itself).
+    """
+    enabled =  os.environ.get('PIXELPRUNE_ENABLED', 'false').lower() in ('true', '1', 'yes')
     if not enabled and not os.environ.get('DEDUP_LOG_FILE', ''):
         return
 
+    if use_vllm:
+        # Plugin entry point handles driver + EngineCore worker + TP workers.
+        return
+
     model_type = _resolve_patch_backend(model_path)
-    if model_type in _PIXELPRUNE_APPLIED_BACKENDS:
+    cache_key = (model_type, 'hf')
+    if cache_key in _PIXELPRUNE_APPLIED_BACKENDS:
         return
 
     _ensure_pixelprune_importable()
     try:
         from pixelprune import apply_pixelprune
         apply_pixelprune(model=model_type)
-        _PIXELPRUNE_APPLIED_BACKENDS.add(model_type)
-        print(f"PixelPrune applied successfully (model={model_type})")
+        _PIXELPRUNE_APPLIED_BACKENDS.add(cache_key)
+        print(f"PixelPrune applied successfully (model={model_type}, backend=hf)")
     except Exception as e:
         print(f"Error applying PixelPrune: {e}")
         raise e
@@ -322,7 +329,7 @@ class Qwen3VLChat(Qwen3VLPromptMixin, BaseModel):
         assert model_path is not None
         self.model_path = model_path
 
-        _maybe_apply_pixelprune(self.model_path)
+        _maybe_apply_pixelprune(self.model_path, use_vllm=bool(kwargs.get('use_vllm', False)))
 
         # Fix Qwen3.5 + flash_attention_2 incompatibility in transformers
         if listinstr(['qwen3.5', 'qwen3_5'], model_path.lower()):
@@ -542,7 +549,7 @@ class Qwen3VLChat(Qwen3VLPromptMixin, BaseModel):
         # STATS_ONLY：仅计算压缩率统计后写入 vit log，跳过模型前向传播
         if (
             not is_omni
-            and os.environ.get('PIXELPRUNE_ENABLED', os.environ.get('ENABLE_DEDUP', 'false')).lower() in ('true', '1', 'yes')
+            and os.environ.get('PIXELPRUNE_ENABLED', 'false').lower() in ('true', '1', 'yes')
             and os.environ.get('STATS_ONLY', 'false').lower() in ('true', '1', 'yes')
         ):
             pixel_values = inputs.get('pixel_values')
