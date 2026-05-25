@@ -1,0 +1,13 @@
+{
+  "method": "pred_2d",
+  "metric": "exact",
+  "threshold": 0.0,
+  "merged_grid": [
+    64,
+    50
+  ],
+  "total_merged": 3200,
+  "kept_merged": 887,
+  "retention": 0.2772,
+  "compression": 3.61
+}

@@ -181,6 +181,59 @@ class Pred2DSelector(BasePatchSelector):
 
         return keep.flatten().nonzero(as_tuple=False)[:, 0]
 
+    def compute_saliency(
+        self,
+        tokens: torch.Tensor,
+        h: int,
+        w: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """
+        计算每个 patch 的预测误差 saliency score（float），供 ADVLASelector 使用。
+
+        与 _select_2d_loco_fast 使用完全相同的 LOCO-I 预测逻辑，
+        区别在于返回连续误差值 [N] 而非 bool keep mask。
+        边界 patch（第一行/列）无法被邻居预测，赋最高分 1.0（强制保留）。
+
+        Args:
+            tokens: merged token 像素值，shape [H*W, D]
+            h: merged token 网格高度
+            w: merged token 网格宽度
+            device: 输出张量设备
+
+        Returns:
+            scores: shape [H*W]，预测误差值，值域 [0, 1]（mae/rmse）或 [0, ∞)（max）
+        """
+        D = tokens.shape[-1]
+        g = tokens.view(h, w, D)
+        method, threshold = self.method, self.threshold
+
+        scores = torch.ones(h, w, device=device)
+
+        if h > 1 and w > 1:
+            X = g[1:, 1:]
+            A = g[1:, :-1]
+            B = g[:-1, 1:]
+            C = g[:-1, :-1]
+
+            cb = _sim2d(C, B, method, threshold)
+            ca = _sim2d(C, A, method, threshold)
+            use_b = ca & ~cb
+
+            pred = torch.where(use_b.unsqueeze(-1), B, A)
+            diff = (X - pred).abs()
+
+            if method in ('max', 'exact'):
+                dist = diff.amax(dim=-1)
+            elif method == 'mae':
+                dist = diff.mean(dim=-1)
+            else:
+                dist = diff.pow(2).mean(dim=-1).sqrt()
+
+            scores[1:, 1:] = dist
+
+        return scores.view(-1)
+
     # ------------------------------------------------------------------
     # 锚定路径：Python 循环，追踪重建值，避免级联误差
     # ------------------------------------------------------------------
@@ -235,3 +288,4 @@ class Pred2DSelector(BasePatchSelector):
                     anchor_grid[r, c] = pred
 
         return keep.flatten().nonzero(as_tuple=False)[:, 0]
+

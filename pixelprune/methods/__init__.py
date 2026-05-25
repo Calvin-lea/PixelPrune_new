@@ -108,12 +108,14 @@ from .serpentine import SerpentineSelector
 from .pred_2d import Pred2DSelector
 from .random_select import RandomSelector
 from .conncomp import ConnCompSelector
+from .ad_vla_selector import ADVLASelector
 
 register_method(RasterSelector)
 register_method(SerpentineSelector)
 register_method(Pred2DSelector)
 register_method(RandomSelector)
 register_method(ConnCompSelector)
+register_method(ADVLASelector)
 
 __all__ = [
     "BasePatchSelector",
@@ -125,4 +127,5 @@ __all__ = [
     "Pred2DSelector",
     "RandomSelector",
     "ConnCompSelector",
+    "ADVLASelector",
 ]
