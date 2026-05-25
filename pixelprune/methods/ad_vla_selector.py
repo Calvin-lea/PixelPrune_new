@@ -122,7 +122,6 @@ class ADVLASelector(BasePatchSelector):
         grid_h:          空间多样性网格行数
         grid_w:          空间多样性网格列数
         min_per_cell:    每个网格格子的最少保留 patch 数
-        saliency_floor: 绝对saliency底线（>0激活混合模式: 超过此值的patch强制保留）
     """
 
     name = "ad_vla"
@@ -135,8 +134,8 @@ class ADVLASelector(BasePatchSelector):
         ratio_min: float = 0.0,
         ratio_max: float = 0.6,
         safe_floor: float = 0.0,
-        gamma_max: float = 0.15,
-        gamma_min: float = 0.05,
+        gamma_max: float = 0.0,
+        gamma_min: float = 0.0,
         alpha: float = 0.7,
         beta: float = 0.3,
         grid_h: int = 4,
